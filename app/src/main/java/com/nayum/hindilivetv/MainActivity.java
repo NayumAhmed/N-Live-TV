@@ -21,6 +21,8 @@ import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -72,10 +74,11 @@ public class MainActivity extends Activity {
     private boolean showingFavorites = false;
     private final List<String> categories = new ArrayList<>();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private final ExecutorService logoExecutor = Executors.newFixedThreadPool(3);
+    
     private final Handler main = new Handler(Looper.getMainLooper());
     private LinearLayout root;
-    private LinearLayout channelList;
+    private ListView channelList;
+    private List<Channel> visibleChannels = new ArrayList<>();
     private TextView status;
     private TextView count;
     private EditText search;
@@ -212,8 +215,11 @@ public class MainActivity extends Activity {
 
         ScrollView scroller = new ScrollView(this);
         scroller.setFillViewport(false);
-        channelList = new LinearLayout(this);
-        channelList.setOrientation(LinearLayout.VERTICAL);
+        channelList = new ListView(this);
+        channelList.setDivider(new android.graphics.drawable.ColorDrawable(0x335FFFFFF));
+        channelList.setDividerHeight(dp(1));
+        channelList.setCacheColorHint(Color.TRANSPARENT);
+        channelList.setBackgroundColor(Color.TRANSPARENT);
         scroller.addView(channelList);
         root.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -339,59 +345,41 @@ public class MainActivity extends Activity {
 
     private void renderChannels() {
         if (channelList == null || count == null) return;
-        channelList.removeAllViews();
-        List<Channel> visible = new ArrayList<>();
+        visibleChannels = new ArrayList<>();
         for (Channel ch : channels) {
             boolean favOk = !showingFavorites || favorites.contains(ch.url);
             boolean categoryOk = showingFavorites || selectedCategory.equals("All Channels") || ch.category.equals(selectedCategory);
             boolean searchOk = searchQuery.isEmpty() || (ch.name + " " + ch.category).toLowerCase(Locale.ROOT).contains(searchQuery);
-            if (favOk && categoryOk && searchOk) visible.add(ch);
+            if (favOk && categoryOk && searchOk) visibleChannels.add(ch);
         }
-        count.setText(visible.size() + " CHANNELS");
-        if (visible.isEmpty()) {
-            TextView empty = text(showingFavorites ? "Your list is empty. Tap + on any channel to save it here." : "No channels found. Try another category or refresh.", 17, MUTED, false);
-            empty.setPadding(dp(16), dp(24), dp(16), dp(24)); channelList.addView(empty); return;
-        }
-        int columns = 4;
-        for (int i=0;i<visible.size();i+=columns) {
-            LinearLayout row = new LinearLayout(this);
-            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1,-2); rp.bottomMargin=dp(12); channelList.addView(row,rp);
-            for (int j=i;j<Math.min(i+columns,visible.size());j++) {
-                Channel ch=visible.get(j);
-                LinearLayout tile=new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER);
-                tile.setPadding(dp(8),dp(8),dp(8),dp(8)); tile.setBackground(glassPanel(16)); tile.setFocusable(true); tile.setFocusableInTouchMode(false); tile.setClickable(true); tile.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
-                ImageView logo = new ImageView(this); logo.setScaleType(ImageView.ScaleType.FIT_CENTER); logo.setBackground(round(Color.rgb(34,37,54),12,0,0));
-                TextView fallback=text(iconFor(ch.category),28,WHITE,true); fallback.setGravity(Gravity.CENTER);
-                logo.setBackground(gradient(new int[]{0xAA8BD7E8, 0xAA5D91B2, 0xAA9DC7D5}, 12));
-                logo.setImageDrawable(round(Color.rgb(34,37,54),12,0,0));
-                if (!ch.logo.isEmpty()) loadChannelLogo(ch.logo,logo);
-                tile.addView(logo,new LinearLayout.LayoutParams(-1,dp(72)));
-                TextView name=text(ch.name,14,WHITE,true); name.setGravity(Gravity.CENTER); name.setMaxLines(2);
-                LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,dp(40)); np.topMargin=dp(7); tile.addView(name,np);
-                LinearLayout footer=new LinearLayout(this); footer.setGravity(Gravity.CENTER_VERTICAL);
-                footer.addView(text(ch.category,10,MUTED,true),new LinearLayout.LayoutParams(-1,dp(20)));
-                tile.addView(footer);
-                tile.setOnClickListener(v->startChannel(ch));
-                tile.setOnFocusChangeListener((v,focused)->{ tile.setBackground(glassPanelFocused(focused)); name.setTextColor(focused ? Color.WHITE : WHITE); });
-                LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1); tp.leftMargin=dp(4); tp.rightMargin=dp(4); row.addView(tile,tp);
+        count.setText(visibleChannels.size() + " CHANNELS");
+        channelList.setAdapter(new BaseAdapter() {
+            @Override public int getCount() { return visibleChannels.size(); }
+            @Override public Object getItem(int position) { return visibleChannels.get(position); }
+            @Override public long getItemId(int position) { return position; }
+            @Override public View getView(int position, View convertView, ViewGroup parent) {
+                TextView row = convertView instanceof TextView ? (TextView) convertView : new TextView(MainActivity.this);
+                Channel ch = visibleChannels.get(position);
+                row.setText(ch.name);
+                row.setTextSize(17);
+                row.setTextColor(WHITE);
+                row.setSingleLine(true);
+                row.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(14), dp(10), dp(14), dp(10));
+                row.setMinHeight(dp(48));
+                row.setFocusable(true);
+                row.setBackground(glassPanel(8));
+                return row;
             }
-            for(int j=row.getChildCount();j<columns;j++) row.addView(new View(this),new LinearLayout.LayoutParams(0,dp(210),1));
-        }
-    }
-
-    private void loadChannelLogo(String address, ImageView target) {
-        target.setTag(address);
-        logoExecutor.execute(() -> {
-            HttpURLConnection conn=null;
-            try {
-                conn=(HttpURLConnection)new URL(address).openConnection();
-                conn.setConnectTimeout(2200); conn.setReadTimeout(2200);
-                try(java.io.InputStream in=conn.getInputStream()) {
-                    Bitmap bmp=BitmapFactory.decodeStream(in);
-                    if(bmp!=null) main.post(()->{ if(address.equals(target.getTag())) target.setImageBitmap(bmp); });
-                }
-            } catch(Exception ignored) { } finally { if(conn!=null) conn.disconnect(); }
         });
+        channelList.setOnItemClickListener((parent, view, position, id) -> {
+            if (position >= 0 && position < visibleChannels.size()) startChannel(visibleChannels.get(position));
+        });
+        if (visibleChannels.isEmpty()) status.setText(showingFavorites
+                ? "Your list is empty. Save a channel while playing to add it here."
+                : "No channels found. Try another category or refresh.");
+        else status.setText("Select a channel to play · " + visibleChannels.size() + " listed");
     }
 
     private void startChannel(Channel channel) {
@@ -639,7 +627,7 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy() {
         if (player != null) { player.release(); player = null; }
         executor.shutdownNow();
-        logoExecutor.shutdownNow();
+
         main.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
