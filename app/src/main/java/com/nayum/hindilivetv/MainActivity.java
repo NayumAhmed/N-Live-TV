@@ -381,15 +381,16 @@ public class MainActivity extends Activity {
                     row.setClickable(true);
                 }
                 Channel ch = visibleChannels.get(position);
-                TextView name = (TextView) row.getChildAt(0);
+                final LinearLayout itemRow = row;
+                TextView name = (TextView) itemRow.getChildAt(0);
                 name.setText(ch.name);
-                row.setBackground(glassPanel(8));
-                row.setOnFocusChangeListener((v, focused) -> {
-                    row.setBackground(focused ? round(0xFF164E80, 8, Color.WHITE, 3) : glassPanel(8));
+                itemRow.setBackground(glassPanel(8));
+                itemRow.setOnFocusChangeListener((v, focused) -> {
+                    itemRow.setBackground(focused ? round(0xFF164E80, 8, Color.WHITE, 3) : glassPanel(8));
                     name.setTextColor(Color.WHITE);
                 });
-                row.setOnClickListener(v -> startChannel(ch));
-                row.setOnKeyListener((v, keyCode, event) -> {
+                itemRow.setOnClickListener(v -> startChannel(ch));
+                itemRow.setOnKeyListener((v, keyCode, event) -> {
                     if (event.getAction() == KeyEvent.ACTION_UP && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
                         startChannel(ch);
                         return true;
