@@ -33,6 +33,8 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.ui.TrackSelectionDialogBuilder;
@@ -218,6 +220,10 @@ public class MainActivity extends Activity {
         channelList.setDividerHeight(dp(1));
         channelList.setCacheColorHint(Color.TRANSPARENT);
         channelList.setBackgroundColor(Color.TRANSPARENT);
+        channelList.setFocusable(true);
+        channelList.setFocusableInTouchMode(true);
+        channelList.setItemsCanFocus(true);
+        channelList.setSelector(round(0xFF245B88, 8, Color.WHITE, 2));
         root.addView(channelList, new LinearLayout.LayoutParams(-1, 0, 1));
 
         status = text("Loading public playlists…", 12, MUTED, false);
@@ -355,18 +361,41 @@ public class MainActivity extends Activity {
             @Override public Object getItem(int position) { return visibleChannels.get(position); }
             @Override public long getItemId(int position) { return position; }
             @Override public View getView(int position, View convertView, ViewGroup parent) {
-                TextView row = convertView instanceof TextView ? (TextView) convertView : new TextView(MainActivity.this);
+                LinearLayout row;
+                if (convertView instanceof LinearLayout && ((LinearLayout) convertView).getChildCount() > 0) {
+                    row = (LinearLayout) convertView;
+                } else {
+                    row = new LinearLayout(MainActivity.this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
+                    TextView name = new TextView(MainActivity.this);
+                    name.setTag("channel_name");
+                    name.setTextSize(17);
+                    name.setTextColor(WHITE);
+                    name.setSingleLine(true);
+                    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    name.setGravity(Gravity.CENTER_VERTICAL);
+                    name.setPadding(dp(14), dp(10), dp(14), dp(10));
+                    row.addView(name, new LinearLayout.LayoutParams(-1, dp(50)));
+                    row.setFocusable(true);
+                    row.setClickable(true);
+                }
                 Channel ch = visibleChannels.get(position);
-                row.setText(ch.name);
-                row.setTextSize(17);
-                row.setTextColor(WHITE);
-                row.setSingleLine(true);
-                row.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(14), dp(10), dp(14), dp(10));
-                row.setMinHeight(dp(48));
-                row.setFocusable(true);
+                TextView name = (TextView) row.getChildAt(0);
+                name.setText(ch.name);
                 row.setBackground(glassPanel(8));
+                row.setOnFocusChangeListener((v, focused) -> {
+                    row.setBackground(focused ? round(0xFF164E80, 8, Color.WHITE, 3) : glassPanel(8));
+                    name.setTextColor(Color.WHITE);
+                });
+                row.setOnClickListener(v -> startChannel(ch));
+                row.setOnKeyListener((v, keyCode, event) -> {
+                    if (event.getAction() == KeyEvent.ACTION_UP && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+                        startChannel(ch);
+                        return true;
+                    }
+                    return false;
+                });
                 return row;
             }
         });
@@ -399,7 +428,13 @@ public class MainActivity extends Activity {
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
         trackSelector = new DefaultTrackSelector(this);
+        DefaultHttpDataSource.Factory httpFactory = new DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Linux; Android TV) NLiveTV/1.0")
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(30000)
+                .setAllowCrossProtocolRedirects(true);
         player = new ExoPlayer.Builder(this)
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(httpFactory))
                 .setLoadControl(loadControl)
                 .setTrackSelector(trackSelector)
                 .build();
