@@ -213,15 +213,12 @@ public class MainActivity extends Activity {
         shelfP.bottomMargin = dp(8);
         root.addView(shelf, shelfP);
 
-        ScrollView scroller = new ScrollView(this);
-        scroller.setFillViewport(false);
         channelList = new ListView(this);
         channelList.setDivider(new android.graphics.drawable.ColorDrawable(0x335FFFFFF));
         channelList.setDividerHeight(dp(1));
         channelList.setCacheColorHint(Color.TRANSPARENT);
         channelList.setBackgroundColor(Color.TRANSPARENT);
-        scroller.addView(channelList);
-        root.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(channelList, new LinearLayout.LayoutParams(-1, 0, 1));
 
         status = text("Loading public playlists…", 12, MUTED, false);
         LinearLayout.LayoutParams statusP = new LinearLayout.LayoutParams(-1, -2);
