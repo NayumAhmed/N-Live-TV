@@ -214,7 +214,7 @@ public class MainActivity extends Activity {
         root.addView(shelf, shelfP);
 
         channelList = new ListView(this);
-        channelList.setDivider(new android.graphics.drawable.ColorDrawable(0x335FFFFFF));
+        channelList.setDivider(new android.graphics.drawable.ColorDrawable(0x33FFFFFF));
         channelList.setDividerHeight(dp(1));
         channelList.setCacheColorHint(Color.TRANSPARENT);
         channelList.setBackgroundColor(Color.TRANSPARENT);
