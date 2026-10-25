@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "app/**"
-      - ".github/workflows/build-hindi-live-tv-apk.yml"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
 permissions:
